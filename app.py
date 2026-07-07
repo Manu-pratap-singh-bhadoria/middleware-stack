@@ -15,43 +15,37 @@ app.add_middleware(
         "https://exam.sanand.workers.dev",
     ],
     allow_credentials=False,
-    allow_methods=["*"],
+    allow_methods=["GET", "OPTIONS"],
     allow_headers=["*"],
     expose_headers=["X-Request-ID"],
-    max_age=86400,
 )
 
 RATE_LIMIT = 10
-WINDOW = 10  # seconds
+WINDOW = 10
 
 clients = {}
 
 
 @app.middleware("http")
-async def request_context_and_rate_limit(request: Request, call_next):
-    # Request ID
+async def middleware(request: Request, call_next):
     request_id = request.headers.get("X-Request-ID")
     if not request_id:
         request_id = str(uuid.uuid4())
 
     request.state.request_id = request_id
 
-    # Only rate limit GET /ping requests that include X-Client-Id
+    # Rate-limit ONLY GET /ping
     if request.method == "GET" and request.url.path == "/ping":
         client_id = request.headers.get("X-Client-Id")
 
-        if client_id:
-            now = time.time()
+        if client_id is not None:
+            now = time.monotonic()
 
-            if client_id not in clients:
-                clients[client_id] = []
+            bucket = clients.setdefault(client_id, [])
 
-            clients[client_id] = [
-                t for t in clients[client_id]
-                if now - t < WINDOW
-            ]
+            bucket[:] = [t for t in bucket if now - t < WINDOW]
 
-            if len(clients[client_id]) >= RATE_LIMIT:
+            if len(bucket) >= RATE_LIMIT:
                 response = JSONResponse(
                     status_code=429,
                     content={"detail": "Rate limit exceeded"},
@@ -59,22 +53,21 @@ async def request_context_and_rate_limit(request: Request, call_next):
                 response.headers["X-Request-ID"] = request_id
                 return response
 
-            clients[client_id].append(now)
+            bucket.append(now)
 
     response = await call_next(request)
     response.headers["X-Request-ID"] = request_id
     return response
 
+
 @app.get("/ping")
 async def ping(request: Request):
     return {
         "email": EMAIL,
-        "request_id": request.state.request_id
+        "request_id": request.state.request_id,
     }
 
 
 @app.get("/")
 async def root():
-    return {
-        "status": "ok"
-    }
+    return {"status": "ok"}
