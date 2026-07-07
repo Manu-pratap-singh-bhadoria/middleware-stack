@@ -36,61 +36,34 @@ async def request_context_and_rate_limit(request: Request, call_next):
 
     request.state.request_id = request_id
 
-    # Client ID for rate limiting
-    client_id = request.headers.get("X-Client-Id")
+    # Only rate limit GET /ping requests that include X-Client-Id
+    if request.method == "GET" and request.url.path == "/ping":
+        client_id = request.headers.get("X-Client-Id")
 
-    # Only rate-limit requests that provide X-Client-Id
-    if client_id:
-        now = time.time()
+        if client_id:
+            now = time.time()
 
-        if client_id not in clients:
-            clients[client_id] = []
+            if client_id not in clients:
+                clients[client_id] = []
 
-        clients[client_id] = [
-            t for t in clients[client_id]
-            if now - t < WINDOW
-        ]
+            clients[client_id] = [
+                t for t in clients[client_id]
+                if now - t < WINDOW
+            ]
 
-        if len(clients[client_id]) >= RATE_LIMIT:
-            response = JSONResponse(
-                status_code=429,
-                content={"detail": "Rate limit exceeded"},
-            )
-            response.headers["X-Request-ID"] = request_id
-            return response
+            if len(clients[client_id]) >= RATE_LIMIT:
+                response = JSONResponse(
+                    status_code=429,
+                    content={"detail": "Rate limit exceeded"},
+                )
+                response.headers["X-Request-ID"] = request_id
+                return response
 
-        clients[client_id].append(now)
-
-        
-    now = time.time()
-
-    if client_id not in clients:
-        clients[client_id] = []
-
-    # Keep only requests within the last WINDOW seconds
-    clients[client_id] = [
-        t for t in clients[client_id]
-        if now - t < WINDOW
-    ]
-
-    # Rate limit: max 10 requests per 10 seconds
-    if len(clients[client_id]) >= RATE_LIMIT:
-        response = JSONResponse(
-            status_code=429,
-            content={"detail": "Rate limit exceeded"},
-        )
-        response.headers["X-Request-ID"] = request_id
-        return response
-
-    clients[client_id].append(now)
+            clients[client_id].append(now)
 
     response = await call_next(request)
-
-    # Echo request ID in every response
     response.headers["X-Request-ID"] = request_id
-
     return response
-
 
 @app.get("/ping")
 async def ping(request: Request):
