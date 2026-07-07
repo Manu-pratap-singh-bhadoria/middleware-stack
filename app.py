@@ -7,7 +7,7 @@ import time
 app = FastAPI()
 
 # Replace with your exam/login email
-EMAIL = "your_email@example.com"
+EMAIL = "24f2006760@ds.study.iitm.ac.in"
 
 # Your assigned CORS origin
 ALLOWED_ORIGIN = "https://app-t5m8rb.example.com"
@@ -60,6 +60,6 @@ async def middleware(request: Request, call_next):
 @app.get("/ping")
 async def ping(request: Request):
     return {
-        "email": "24f2006760@ds.study.iitm.ac.in",
+        "email": EMAIL,
         "request_id": request.state.request_id
     }
