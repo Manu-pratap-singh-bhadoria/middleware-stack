@@ -10,11 +10,12 @@ app = FastAPI()
 EMAIL = "24f2006760@ds.study.iitm.ac.in"
 
 # Your assigned CORS origin
-ALLOWED_ORIGIN = "https://app-t5m8rb.example.com"
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[ALLOWED_ORIGIN],
+    allow_origins=[
+        "https://app-t5m8rb.example.com",
+        "https://exam.sanand.workers.dev",
+    ],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
