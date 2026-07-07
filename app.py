@@ -37,7 +37,31 @@ async def request_context_and_rate_limit(request: Request, call_next):
     request.state.request_id = request_id
 
     # Client ID for rate limiting
-    client_id = request.headers.get("X-Client-Id", "anonymous")
+    client_id = request.headers.get("X-Client-Id")
+
+    # Only rate-limit requests that provide X-Client-Id
+    if client_id:
+        now = time.time()
+
+        if client_id not in clients:
+            clients[client_id] = []
+
+        clients[client_id] = [
+            t for t in clients[client_id]
+            if now - t < WINDOW
+        ]
+
+        if len(clients[client_id]) >= RATE_LIMIT:
+            response = JSONResponse(
+                status_code=429,
+                content={"detail": "Rate limit exceeded"},
+            )
+            response.headers["X-Request-ID"] = request_id
+            return response
+
+        clients[client_id].append(now)
+
+        
     now = time.time()
 
     if client_id not in clients:
