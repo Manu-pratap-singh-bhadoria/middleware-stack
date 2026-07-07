@@ -28,21 +28,22 @@ clients = {}
 
 @app.middleware("http")
 async def middleware(request: Request, call_next):
-    request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+    request_id = request.headers.get("X-Request-ID")
+    if not request_id:
+        request_id = str(uuid.uuid4())
+
     request.state.request_id = request_id
 
-    # Clean expired timestamps from all clients
-    now = time.monotonic()
-    for cid in list(clients.keys()):
-        clients[cid] = [t for t in clients[cid] if now - t < WINDOW]
-        if not clients[cid]:
-            del clients[cid]
-
+    # Rate-limit ONLY GET /ping
     if request.method == "GET" and request.url.path == "/ping":
         client_id = request.headers.get("X-Client-Id")
 
-        if client_id:
+        if client_id is not None:
+            now = time.monotonic()
+
             bucket = clients.setdefault(client_id, [])
+
+            bucket[:] = [t for t in bucket if now - t < WINDOW]
 
             if len(bucket) >= RATE_LIMIT:
                 response = JSONResponse(
