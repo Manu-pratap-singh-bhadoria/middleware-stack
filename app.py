@@ -17,7 +17,8 @@ app.add_middleware(
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["X-Request-ID"],  # Important for browser access
+    expose_headers=["X-Request-ID"],
+    max_age=86400,
 )
 
 RATE_LIMIT = 10
